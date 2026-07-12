@@ -14,6 +14,13 @@ function getReadClient() {
 }
 
 function getWriteClient(account) {
+  if (typeof account === 'string') {
+    return createClient({
+      chain: studionet,
+      account,
+      provider: window.ethereum,
+    });
+  }
   return createClient({ chain: studionet, account });
 }
 
@@ -64,24 +71,34 @@ export function useBrandGuard() {
       setLoading(true);
       setError('');
       if (typeof window !== 'undefined' && window.ethereum) {
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        const addr = accounts[0].toLowerCase();
-        setAddress(addr);
-        setGlAccount(addr);
-      } else {
-        // Ephemeral account fallback
-        let savedKey = localStorage.getItem('__brandguard_sk');
-        let acct;
-        if (savedKey) {
-          acct = createAccount(savedKey);
-        } else {
-          acct = createAccount();
-          localStorage.setItem('__brandguard_sk', acct.privateKey);
+        try {
+          const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+          const addr = accounts[0].toLowerCase();
+          
+          // Test snap connection. If it fails, fallback to Demo Wallet.
+          const client = getWriteClient(addr);
+          await client.connect();
+
+          setAddress(addr);
+          setGlAccount(addr);
+          return; // Success
+        } catch (walletErr) {
+          console.warn('MetaMask Snap not supported or connection failed, using Demo Wallet:', walletErr);
         }
-        const addr = acct.address.toLowerCase();
-        setAddress(addr);
-        setGlAccount(acct);
       }
+
+      // Ephemeral account fallback
+      let savedKey = localStorage.getItem('__brandguard_sk');
+      let acct;
+      if (savedKey) {
+        acct = createAccount(savedKey);
+      } else {
+        acct = createAccount();
+        localStorage.setItem('__brandguard_sk', acct.privateKey);
+      }
+      const addr = acct.address.toLowerCase();
+      setAddress(addr);
+      setGlAccount(acct);
     } catch (err) {
       console.error('Wallet connection failed:', err);
       setError('Wallet connection failed: ' + err.message);
@@ -139,6 +156,10 @@ export function useBrandGuard() {
       const client = getWriteClient(glAccount);
       const valueWei = parseGen(payoutAmountGen);
       
+      if (typeof glAccount === 'string') {
+        await client.connect();
+      }
+
       const hash = await client.writeContract({
         address: CONTRACT_ADDRESS,
         functionName: 'create_campaign',
@@ -186,6 +207,11 @@ export function useBrandGuard() {
 
     try {
       const client = getWriteClient(glAccount);
+      
+      if (typeof glAccount === 'string') {
+        await client.connect();
+      }
+
       const hash = await client.writeContract({
         address: CONTRACT_ADDRESS,
         functionName: 'submit_content',
@@ -228,6 +254,11 @@ export function useBrandGuard() {
 
     try {
       const client = getWriteClient(glAccount);
+      
+      if (typeof glAccount === 'string') {
+        await client.connect();
+      }
+
       const hash = await client.writeContract({
         address: CONTRACT_ADDRESS,
         functionName: 'cancel_campaign',
@@ -270,6 +301,11 @@ export function useBrandGuard() {
 
     try {
       const client = getWriteClient(glAccount);
+      
+      if (typeof glAccount === 'string') {
+        await client.connect();
+      }
+
       const hash = await client.writeContract({
         address: CONTRACT_ADDRESS,
         functionName: 'evaluate_submission',
